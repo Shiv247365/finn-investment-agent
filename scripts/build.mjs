@@ -1,0 +1,10 @@
+import {build} from 'esbuild';
+import {mkdir,readFile,writeFile,copyFile} from 'node:fs/promises';
+const client=await build({entryPoints:['src/client.js'],bundle:true,format:'iife',target:'es2022',minify:true,write:false});
+let page=await readFile('src/page.html','utf8');
+page=page.replace('/*STYLE*/',await readFile('src/style.css','utf8')).replace('/*CLIENT*/',()=>client.outputFiles[0].text.replace(/<\/script/gi,'<\\/script'));
+await mkdir('worker',{recursive:true});
+await build({entryPoints:['src/worker.js'],bundle:true,format:'esm',target:'es2022',platform:'browser',conditions:['worker','browser'],outfile:'worker/index.js',minify:true,external:['node:*'],plugins:[{name:'inline-page',setup(b){b.onLoad({filter:/page\.html$/},()=>({contents:page,loader:'text'}));}}]});
+await mkdir('dist/server',{recursive:true});await mkdir('dist/.openai',{recursive:true});
+await copyFile('worker/index.js','dist/server/index.js');await copyFile('.openai/hosting.json','dist/.openai/hosting.json');
+console.log('FINN built: single Worker ESM with embedded responsive app.');
